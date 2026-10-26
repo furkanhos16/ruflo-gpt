@@ -1,0 +1,10 @@
+node_modules/
+.ruflo-setup/
+.env
+.env.*
+!.env.example
+state/
+backups/
+*.log
+test-results.json
+.DS_Store

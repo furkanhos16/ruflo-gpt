@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ruflo · Codex"
+  short_description: "Kalıcı proje görevleri ve yerel hafıza"
+  default_prompt: "Bu projedeki çok aşamalı işi $ruflo-codex ile takip et ve kaldığı yerden sürdür."

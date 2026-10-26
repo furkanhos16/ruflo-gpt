@@ -1,0 +1,622 @@
+[
+  {
+    "name": "memory_store",
+    "description": "Persistent key-value store with vector embedding — survives across sessions and is searchable by meaning, not just by file path. Use for project-scoped persistent memory. Never import personal memory automatically. Data is isolated by project_path; runtime reports actual embedding and storage backend.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Memory key (unique within namespace)",
+          "minLength": 1
+        },
+        "value": {
+          "description": "Value to store (string or object)"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Namespace for organization (default: \"default\")"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional tags for filtering"
+        },
+        "ttl": {
+          "type": "number",
+          "description": "Time-to-live in seconds (optional)",
+          "exclusiveMinimum": 0
+        },
+        "upsert": {
+          "type": "boolean",
+          "description": "Update existing key instead of failing (default: true, matching CLI `memory store`; set false for strict-insert). #2775 parity."
+        },
+        "provenance_type": {
+          "type": "string",
+          "enum": [
+            "user_claim",
+            "agent_output",
+            "system_observation",
+            "tool_result",
+            "unknown"
+          ],
+          "description": "ADR-323: who/what produced this value, so shared-namespace retrieval can filter by trust level instead of conflating a user's stated claim with an agent's own output. Default: \"unknown\"."
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "key",
+        "value",
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "memory_retrieve",
+    "description": "Read back a value previously stored via memory_store, by exact (namespace, key) — lossless, includes metadata. Use for project-scoped persistent memory. Never import personal memory automatically. Data is isolated by project_path; runtime reports actual embedding and storage backend.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Memory key",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Namespace (default: \"default\")"
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "key",
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "memory_search",
+    "description": "Find stored memories by meaning (vector similarity), not by literal text — finds \"JWT auth pattern\" when you query \"token-based login flow\". Use for project-scoped persistent memory. Never import personal memory automatically. Data is isolated by project_path; runtime reports actual embedding and storage backend.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query (semantic similarity)",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Namespace to search (default: all namespaces — omit to search across every namespace)"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum results (default: 10)",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Minimum raw retrieval relevance 0-1 for candidate admission, applied per query before SmartRetrieval ranking; not a floor on rankingScore (default: 0.2; calibrated for the bundled embedding model, pass 0 to see every match)",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "smart": {
+          "type": "boolean",
+          "description": "Enable SmartRetrieval — query expansion, RRF fusion, recency boost, MMR diversity; preserves raw similarity and adds rankingScore (default: false)"
+        },
+        "provenance_filter": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "user_claim",
+              "agent_output",
+              "system_observation",
+              "tool_result",
+              "unknown"
+            ]
+          },
+          "description": "ADR-323: restrict results to these provenance types (e.g. exclude user_claim when fact-checking). Omit for no filtering. Enforced for standard and SmartRetrieval searches."
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "query",
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "memory_delete",
+    "description": "Remove a stored memory entry by exact (namespace, key). Use for project-scoped persistent memory. Never import personal memory automatically. Data is isolated by project_path; runtime reports actual embedding and storage backend.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Memory key",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Namespace (default: \"default\")"
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "key",
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "memory_list",
+    "description": "Enumerate stored memory entries (optionally filtered by namespace/tags) without semantic search. Use for project-scoped persistent memory. Never import personal memory automatically. Data is isolated by project_path; runtime reports actual embedding and storage backend.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "description": "Filter by namespace"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Require entries to include all of these tags (AND). Matches the description claim \"optionally filtered by namespace/tags\"."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum results (default: 50)",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Offset for pagination (default: 0)",
+          "minimum": 0
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "memory_stats",
+    "description": "Get memory storage statistics including HNSW index status Use for project-scoped persistent memory. Never import personal memory automatically. Data is isolated by project_path; runtime reports actual embedding and storage backend.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "task_create",
+    "description": "Use when tracking persistent work across Codex sessions: create. Stores task metadata only; does not start or execute an agent. Isolated by project_path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Task type (feature, bugfix, research, refactor)",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "description": "Task description",
+          "minLength": 1
+        },
+        "priority": {
+          "type": "string",
+          "description": "Task priority (low, normal, high, critical)",
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "critical"
+          ]
+        },
+        "assignTo": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Agent IDs to assign"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Task tags"
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "type",
+        "description",
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "task_status",
+    "description": "Use when tracking persistent work across Codex sessions: status. Stores task metadata only; does not start or execute an agent. Isolated by project_path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task ID",
+          "minLength": 1
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "taskId",
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "task_list",
+    "description": "Use when tracking persistent work across Codex sessions: list. Stores task metadata only; does not start or execute an agent. Isolated by project_path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Filter by status"
+        },
+        "type": {
+          "type": "string",
+          "description": "Filter by type",
+          "minLength": 1
+        },
+        "assignedTo": {
+          "type": "string",
+          "description": "Filter by assigned agent"
+        },
+        "priority": {
+          "type": "string",
+          "description": "Filter by priority",
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "critical"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max tasks to return",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "task_complete",
+    "description": "Use when tracking persistent work across Codex sessions: complete. Stores task metadata only; does not start or execute an agent. Isolated by project_path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task ID",
+          "minLength": 1
+        },
+        "result": {
+          "type": "object",
+          "description": "Task result data"
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "taskId",
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "task_update",
+    "description": "Use when tracking persistent work across Codex sessions: update. Stores task metadata only; does not start or execute an agent. Isolated by project_path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task ID",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "description": "New status: pending, in_progress, completed, failed or cancelled",
+          "enum": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "progress": {
+          "type": "number",
+          "description": "Progress percentage (0-100)",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "assignTo": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Agent IDs to assign"
+        },
+        "result": {
+          "type": "object",
+          "description": "Result data (e.g. the failure of a failed task)"
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "taskId",
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "task_assign",
+    "description": "Use when tracking persistent work across Codex sessions: assign. Stores task metadata only; does not start or execute an agent. Isolated by project_path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task ID to assign",
+          "minLength": 1
+        },
+        "agentIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Agent IDs to assign"
+        },
+        "unassign": {
+          "type": "boolean",
+          "description": "Unassign all agents from task"
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "taskId",
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "task_cancel",
+    "description": "Use when tracking persistent work across Codex sessions: cancel. Stores task metadata only; does not start or execute an agent. Isolated by project_path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task ID",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "description": "Cancellation reason"
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "taskId",
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "task_retry",
+    "description": "Use when tracking persistent work across Codex sessions: retry. Stores task metadata only; does not start or execute an agent. Isolated by project_path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "ID of the task to retry",
+          "minLength": 1
+        },
+        "resetState": {
+          "type": "boolean",
+          "description": "Reset progress/result on the new task (default true)"
+        },
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "taskId",
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "task_summary",
+    "description": "Use when tracking persistent work across Codex sessions: summary. Stores task metadata only; does not start or execute an agent. Isolated by project_path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the existing project directory. Always use the current task workspace. Each canonical path has its own isolated Ruflo store."
+        }
+      },
+      "required": [
+        "project_path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  }
+]
